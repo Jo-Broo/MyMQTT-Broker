@@ -8,14 +8,17 @@ using System.Threading.Tasks;
 
 namespace MyMQTT_Broker_Test
 {
-    internal class MQTTBroker
+    public class MQTTBroker
     {
         private TcpListener _server;
+
+        private List<MQTTClient> Clients;
 
         public MQTTBroker(int port)
         {
             IPAddress own = Dns.GetHostEntry(Dns.GetHostName()).AddressList.Where(x => x.AddressFamily == AddressFamily.InterNetwork).ToList()[0];
             this._server = new TcpListener(own, 1883);
+            this.Clients = new List<MQTTClient>();
         }
 
         public void Start() 
@@ -27,7 +30,7 @@ namespace MyMQTT_Broker_Test
             {
                 var client = this._server.AcceptTcpClient();
                 Console.WriteLine("Client connected");
-                this.HandleClient(client);
+                Task.Run(() => { HandleClient(client); });
             }
         }
 
@@ -35,44 +38,50 @@ namespace MyMQTT_Broker_Test
         {
             NetworkStream stream = client.GetStream();
             byte[] buffer = new byte[1024];
-            bool disconnect = false;
+            MQTTClient MQTTclient = null;
 
             while (client.Connected)
             {
                 int bytesRead = stream.Read(buffer, 0, buffer.Length);
                 if (bytesRead > 0)
                 {
-                    // Parse the incoming frame
-                    var frame = new MQTTFrame(buffer);
-                    switch (frame.PacketType)
+                    PacketType packetType = MQTTFrameIdentifier.GetPacketTypeOfFrame(buffer);
+                    switch (packetType)
                     {
                         case PacketType.CONNECT:
-                            MQTTCONNECT mqttCONNECT = new MQTTCONNECT(buffer);
-                            Console.WriteLine(mqttCONNECT.ToString());
+                            MQTTCONNECT Connect = new MQTTCONNECT(buffer);
+                            Console.WriteLine(Connect.ToString());
+
+                            var existingClient = this.Clients.FirstOrDefault(x => x.ClientIdentifier == Connect.ClientIdentifier);
+
+                            if (existingClient != null) 
+                            {
+                                // Boar ich hab halt keine Ahnung von so Client-Server Geschichten ._.
+                                //existingClient.TcpClient.Close();
+                                Console.WriteLine("Client mit dem selben bereits vorhanden.");
+                                break; 
+                            }
 
                             MQTTCONNACK mqttCONNACK = new MQTTCONNACK();
                             Console.WriteLine(BitConverter.ToString(mqttCONNACK.GetFrame()));
 
                             stream.Write(mqttCONNACK.GetFrame(), 0, mqttCONNACK.GetFrame().Length);
                             Console.WriteLine("Sent CONNACK frame to client.");
-                            break;
 
+                            MQTTclient = new MQTTClient(Connect.ClientIdentifier, client);
+                            this.Clients.Add(MQTTclient);
+                            break;
                         case PacketType.DISCONNECT:
-                            disconnect = true;
                             break;
-
+                        case PacketType.PUBLISH:
+                            break;
                         default:
-                            Console.WriteLine(BitConverter.ToString(buffer));
-                            Console.WriteLine("This packet type is not supported yet.");
+                            Console.WriteLine($"Packettype: {packetType} is not supported yet");
                             break;
                     }
                 }
-                if (disconnect) { break; }
             }
-
             client.Close();
         }
-
-
     }
 }

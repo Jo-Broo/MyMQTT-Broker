@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -13,9 +14,16 @@ namespace MyMQTT_Broker_Test
      die ganze struktur mit den Klassen das wird sonst doof
      */
 
+    public static class MQTTFrameIdentifier
+    {
+        public static PacketType GetPacketTypeOfFrame(byte[] data)
+        {
+            byte controlfield = data[0];
+            byte packettype = (byte)(controlfield >> 4);
 
-
-
+            return (PacketType)packettype;
+        }
+    }
 
     /// <summary>
     /// Basis Klasse für alle Arten von Frames
@@ -25,33 +33,29 @@ namespace MyMQTT_Broker_Test
         /// <summary>
         /// enthält den kompletten Frame 
         /// </summary>
-        internal byte[] rawData;
+        public byte[] rawData;
         /// <summary>
         /// enthält den Fixed Header Teil
         /// </summary>
-        internal byte[] fixedHeader;
+        public byte[] fixedHeader;
         /// <summary>
         /// enthält den Variable Header Teil
         /// </summary>
-        internal byte[]? variableHeader;
+        public byte[]? variableHeader;
         /// <summary>
         /// enthält den Payload Teil
         /// </summary>
-        internal byte[]? payload;
+        public byte[]? payload;
         /// <summary>
         /// index zum analysieren des Frames
         /// </summary>
-        internal int index;
-        public byte[] RawData { get { return rawData; } }
-        public byte[] FixedHeader { get { return fixedHeader ?? new byte[1]; } }
-        public byte[] VariableHeader { get { return variableHeader ?? new byte[1]; ; } }
-        public byte[] Payload { get { return payload ?? new byte[1]; ; } }
-        public PacketType PacketType { get; internal set; }
-        public byte Flags { get; internal set; }
-        internal int remainingLength;
-        
-        public MQTTFrame() { }
+        public int index;
 
+        public PacketType PacketType;
+
+        public int remainingLength;
+
+        public MQTTFrame() { }
         public MQTTFrame(byte[] data) 
         { 
             this.rawData = data;
@@ -65,8 +69,6 @@ namespace MyMQTT_Broker_Test
             byte controlfield = this.rawData[index++];
             byte packettype = (byte)(controlfield >> 4);
             byte flags = (byte)(controlfield & 0x0F);
-            this.PacketType = (PacketType)packettype;
-            this.Flags = flags;
 
             // Remaining Length
             this.remainingLength = 0;
@@ -82,6 +84,11 @@ namespace MyMQTT_Broker_Test
             this.fixedHeader = new byte[index];
             Array.Copy(this.rawData, 0, this.fixedHeader, 0, index);
             #endregion
+        }
+
+        internal bool isBitset(byte data, int bit)
+        {
+            return (data & (1 << bit)) != 0;
         }
     }
 
@@ -102,7 +109,6 @@ namespace MyMQTT_Broker_Test
         // Konstruktor, der das empfangene Daten-Array parst
         public MQTTCONNECT(byte[] data) : base(data)
         {
-            
             this.rawData = data;
             this.ParseVariableHeader();
             this.ParsePayLoad();
@@ -168,14 +174,9 @@ namespace MyMQTT_Broker_Test
             #endregion
         }
 
-        private bool isBitset(byte data, int bit)
-        {
-            return (data & (1 << bit)) != 0;
-        }
-
         public override string ToString()
         {
-            return $"PacketType: {this.PacketType}, Flags: {Flags}, Protokoll: {this.ProtokollName} FixedHeader: {BitConverter.ToString(this.fixedHeader)}, VariableHeader: {BitConverter.ToString(this.variableHeader)}, Payload: {BitConverter.ToString(this.payload)}, Client: {this.ClientIdentifier}";
+            return $"PacketType: {this.PacketType}, Protokoll: {this.ProtokollName} FixedHeader: {BitConverter.ToString(this.fixedHeader)}, VariableHeader: {BitConverter.ToString(this.variableHeader)}, Payload: {BitConverter.ToString(this.payload)}, Client: {this.ClientIdentifier}";
         }
     }
 
@@ -193,13 +194,6 @@ namespace MyMQTT_Broker_Test
 
         public byte[] GetFrame()
         {
-            //List<byte> data = new List<byte>();
-            //data.Add(((byte)this.Packettype));
-            //data.Add((byte)this.remainingLength);
-            //data.Add((byte)(this.SessionsPresent?1:0));
-            //data.Add((byte)this.connectReturnCode);
-
-            //return data.ToArray();
             byte[] frame = new byte[4];
             frame[0] = 0x20; // CONNACK Pakettyp und Flags (0010 0000)
             frame[1] = 0x02; // Remaining Length (2 Bytes)
@@ -213,9 +207,9 @@ namespace MyMQTT_Broker_Test
     {
         CONNECT = 1,
         CONNACK = 2,
-        DISCONNECT = 14
-        //PUBLISH = 3,
-        //PUBACK = 4,
+        DISCONNECT = 14,
+        PUBLISH = 3,
+        PUBACK = 4
         //PUBREC = 5,
         //PUBREL = 6,
         //PUBCOMP = 7,
