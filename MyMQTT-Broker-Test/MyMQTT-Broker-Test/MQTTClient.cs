@@ -10,13 +10,12 @@ namespace MyMQTT_Broker_Test
     public class MQTTClient
     {
         public string ClientIdentifier { get; set; }
-
         public TcpClient TcpClient { get; set; }
 
-        public MQTTClient(string ID, TcpClient client) 
+        public MQTTClient(TcpClient client, string clientIdentifier)
         {
-            this.ClientIdentifier = ID;
             this.TcpClient = client;
+            this.ClientIdentifier = clientIdentifier; 
         }
     }
 }

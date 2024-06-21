@@ -50,7 +50,9 @@ namespace MyMQTT_Broker_Test
         /// index zum analysieren des Frames
         /// </summary>
         public int index;
-
+        /// <summary>
+        /// Referenz für den Packettype
+        /// </summary>
         public PacketType PacketType;
 
         public int remainingLength;
@@ -203,6 +205,17 @@ namespace MyMQTT_Broker_Test
             return frame;
         }
     }
+
+    public class MQTTSUBSCRIBE : MQTTFrame 
+    {
+        // TODO
+    }
+
+    public class MQTTSUBACK : MQTTFrame
+    {
+        // TODO
+    }
+
     public enum PacketType
     {
         CONNECT = 1,
